@@ -1,6 +1,6 @@
 # Dynamic-Color DWL Package
 
-This repository is a personal Arch package source for `dwl` 0.7 that tries to emulate the dwm-6.8 patches. It keeps the
+This repository is a personal Arch package source for `dwl` 0.7 that tries to emulate the `dwm-6.8` patches. It keeps the
 simple suckless-style local build workflow, but adds the pieces needed to make a
 Wayland session feel closer to a tuned `dwm` setup: a top bar, familiar
 keybindings, a dmenu replacement, clickable tags, and live wallpaper-derived
