@@ -89,7 +89,7 @@ desktop_candidates | sort -u > "$apps"
 	path_candidates
 	zsh_candidates
 	cut -f1 "$apps"
-} | awk 'NF && !seen[$0]++' > "$candidates"
+} | awk '$0 != "start-dwl" && NF && !seen[$0]++' > "$candidates"
 
 selection=$(
 	bemenu \
