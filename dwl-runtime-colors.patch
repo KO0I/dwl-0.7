@@ -1,0 +1,151 @@
+--- a/dwl.c
++++ b/dwl.c
+@@ -8,6 +8,7 @@
+ #include <signal.h>
+ #include <stdio.h>
+ #include <stdlib.h>
++#include <string.h>
+ #include <sys/wait.h>
+ #include <time.h>
+ #include <unistd.h>
+@@ -248,6 +249,7 @@
+ static void arrange(Monitor *m);
+ static void arrangelayer(Monitor *m, struct wl_list *list,
+ 		struct wlr_box *usable_area, int exclusive);
++static void applycolors(void);
+ static void arrangelayers(Monitor *m);
+ static void axisnotify(struct wl_listener *listener, void *data);
+ static void buttonpress(struct wl_listener *listener, void *data);
+@@ -317,6 +319,8 @@
+ static void powermgrsetmode(struct wl_listener *listener, void *data);
+ static void quit(const Arg *arg);
+ static void rendermon(struct wl_listener *listener, void *data);
++static void reloadcolors(void);
++static int reloadcolorssignal(int signal_number, void *data);
+ static void requestdecorationmode(struct wl_listener *listener, void *data);
+ static void requeststartdrag(struct wl_listener *listener, void *data);
+ static void requestmonstate(struct wl_listener *listener, void *data);
+@@ -481,6 +485,107 @@
+ 	setmon(c, mon, newtags);
+ }
+ 
++static void
++applycolors(void)
++{
++	Client *c, *focused;
++	const float *color;
++	int i;
++
++	if (root_bg)
++		wlr_scene_rect_set_color(root_bg, rootcolor);
++
++	wl_list_for_each(c, &clients, link) {
++		if (client_is_unmanaged(c))
++			continue;
++		focused = c->mon ? focustop(c->mon) : NULL;
++		color = c->isurgent ? urgentcolor : (c == focused ? focuscolor : bordercolor);
++		for (i = 0; i < 4; i++) {
++			if (c->border[i])
++				wlr_scene_rect_set_color(c->border[i], color);
++		}
++	}
++}
++
++static char *
++expandthemefile(char *buf, size_t len)
++{
++	const char *home;
++
++	if (themefile[0] != '~' || themefile[1] != '/')
++		return (char *)themefile;
++	if (!(home = getenv("HOME")))
++		return (char *)themefile;
++
++	snprintf(buf, len, "%s/%s", home, themefile + 2);
++	return buf;
++}
++
++static int
++parsecolor(const char *value, float color[4])
++{
++	unsigned int r, g, b;
++
++	while (*value == ' ' || *value == '\t')
++		value++;
++	if (*value == '#')
++		value++;
++	if (sscanf(value, "%2x%2x%2x", &r, &g, &b) != 3)
++		return 0;
++
++	color[0] = r / 255.0f;
++	color[1] = g / 255.0f;
++	color[2] = b / 255.0f;
++	color[3] = 1.0f;
++	return 1;
++}
++
++static void
++loadthemecolor(FILE *fp, const char *resource, float color[4])
++{
++	char line[256], *value;
++	size_t len = strlen(resource);
++
++	rewind(fp);
++	while (fgets(line, sizeof line, fp)) {
++		if (strncmp(line, resource, len) || line[len] != ':')
++			continue;
++		value = line + len + 1;
++		if (!parsecolor(value, color))
++			wlr_log(WLR_ERROR, "invalid color for %s in %s", resource, themefile);
++		return;
++	}
++}
++
++static void
++reloadcolors(void)
++{
++	FILE *fp;
++	char path[4096];
++
++	fp = fopen(expandthemefile(path, sizeof path), "r");
++	if (!fp) {
++		wlr_log(WLR_ERROR, "could not open theme file %s", themefile);
++		return;
++	}
++
++	loadthemecolor(fp, "dwm.normbgcolor", rootcolor);
++	loadthemecolor(fp, "dwm.normbordercolor", bordercolor);
++	loadthemecolor(fp, "dwm.selbordercolor", focuscolor);
++	loadthemecolor(fp, "dwm.urgbordercolor", urgentcolor);
++	fclose(fp);
++
++	applycolors();
++	wlr_log(WLR_INFO, "reloaded colors from %s", themefile);
++}
++
++static int
++reloadcolorssignal(int signal_number, void *data)
++{
++	reloadcolors();
++	return 0;
++}
++
+ void
+ arrange(Monitor *m)
+ {
+@@ -2442,6 +2547,7 @@
+ 	 * clients from the Unix socket, manging Wayland globals, and so on. */
+ 	dpy = wl_display_create();
+ 	event_loop = wl_display_get_event_loop(dpy);
++	wl_event_loop_add_signal(event_loop, SIGUSR1, reloadcolorssignal, NULL);
+ 
+ 	/* The backend is a wlroots feature which abstracts the underlying input and
+ 	 * output hardware. The autocreate option will choose the most suitable
+@@ -2534,6 +2640,7 @@
+ 	 */
+ 	wl_list_init(&clients);
+ 	wl_list_init(&fstack);
++	reloadcolors();
+ 
+ 	xdg_shell = wlr_xdg_shell_create(dpy, 6);
+ 	LISTEN_STATIC(&xdg_shell->events.new_toplevel, createnotify);

@@ -1,0 +1,29 @@
+#!/bin/sh
+
+DWL_HELPER_DIR=${DWL_HELPER_DIR:-/usr/lib/dwl-personal}
+
+wallpaper=$("$DWL_HELPER_DIR/dwl-wallpaper") || {
+	printf '%s\n' "dwl-wallust-refresh: no readable nitrogen wallpaper" >&2
+	exit 1
+}
+
+wallust run -q -s -w "$wallpaper" || exit 1
+"$DWL_HELPER_DIR/dwl-apply-toolkit-theme" || true
+
+pkill -u "$(id -u)" -x swaybg 2>/dev/null || true
+swaybg -i "$wallpaper" -m fill &
+
+dwl_pid=${DWL_PID:-$PPID}
+if [ -z "$dwl_pid" ] || ! kill -0 "$dwl_pid" 2>/dev/null || [ "$(basename "$(readlink "/proc/$dwl_pid/exe" 2>/dev/null)" 2>/dev/null)" != "dwl" ]; then
+	dwl_pid=$(pgrep -n -x dwl 2>/dev/null || true)
+fi
+if [ -n "$dwl_pid" ]; then
+	kill -USR1 "$dwl_pid" 2>/dev/null || true
+fi
+
+if command -v dwlb >/dev/null 2>&1; then
+	pkill -u "$(id -u)" -x dwlb 2>/dev/null || true
+	"$DWL_HELPER_DIR/dwlb-launch" &
+	sleep 0.2
+	"$DWL_HELPER_DIR/dwlb-status" &
+fi

@@ -1,0 +1,116 @@
+#!/bin/sh
+
+DWL_HELPER_DIR=${DWL_HELPER_DIR:-/usr/lib/dwl-personal}
+. "$DWL_HELPER_DIR/dwl-colors"
+
+tmpdir=${TMPDIR:-/tmp}/dwl-bemenu-run.$$
+trap 'rm -rf "$tmpdir"' EXIT HUP INT TERM
+mkdir -p "$tmpdir" || exit 1
+
+candidates=$tmpdir/candidates
+apps=$tmpdir/apps
+
+desktop_candidates() {
+	find "$HOME/.local/share/applications" /usr/share/applications \
+		-maxdepth 1 -type f -name '*.desktop' 2>/dev/null |
+	while IFS= read -r file; do
+		awk -v file="$file" '
+			BEGIN {
+				name = "";
+				nodisplay = "false";
+				hidden = "false";
+			}
+			/^\[Desktop Entry\]/ { in_entry = 1; next }
+			/^\[/ && !/^\[Desktop Entry\]/ { in_entry = 0 }
+			in_entry && /^Name=/ && name == "" {
+				sub(/^Name=/, "");
+				name = $0;
+			}
+			in_entry && /^NoDisplay=/ {
+				sub(/^NoDisplay=/, "");
+				nodisplay = tolower($0);
+			}
+			in_entry && /^Hidden=/ {
+				sub(/^Hidden=/, "");
+				hidden = tolower($0);
+			}
+			END {
+				if (name != "" && nodisplay != "true" && hidden != "true") {
+					id = file;
+					sub(/^.*\//, "", id);
+					sub(/\.desktop$/, "", id);
+					printf "app: %s\tgtk-launch %s\n", name, id;
+				}
+			}
+		' "$file"
+	done
+}
+
+history_candidates() {
+	[ -r "$HOME/.zsh_history" ] || return 0
+	awk '
+		{
+			line = $0;
+			if (line ~ /^: [0-9]+:[0-9]+;/)
+				sub(/^: [0-9]+:[0-9]+;/, "", line);
+			if (line != "")
+				h[++n] = line;
+		}
+		END {
+			for (i = n; i >= 1; i--) {
+				if (!seen[h[i]]++) {
+					print h[i];
+					if (++count >= 300)
+						break;
+				}
+			}
+		}
+	' "$HOME/.zsh_history"
+}
+
+path_candidates() {
+	printf '%s' "$PATH" | tr ':' '\n' |
+	while IFS= read -r dir; do
+		[ -d "$dir" ] || continue
+		find "$dir" -maxdepth 1 -type f -perm -u+x -printf '%f\n' 2>/dev/null
+	done | sort -u
+}
+
+zsh_candidates() {
+	zsh -ic '
+		whence -wm "*" | sed -n "s/: alias$//p"
+		functions | awk "/^[A-Za-z0-9_-]+ \\(\\)/ { if (\$1 !~ /^_/) print \$1 }"
+	' 2>/dev/null | sort -u
+}
+
+desktop_candidates | sort -u > "$apps"
+{
+	history_candidates
+	path_candidates
+	zsh_candidates
+	cut -f1 "$apps"
+} | awk 'NF && !seen[$0]++' > "$candidates"
+
+selection=$(
+	bemenu \
+		--fn "Terminus 12" \
+		--tb "$DWL_NORM_BG" --tf "$DWL_NORM_FG" \
+		--fb "$DWL_NORM_BG" --ff "$DWL_NORM_FG" \
+		--nb "$DWL_NORM_BG" --nf "$DWL_NORM_FG" \
+		--hb "$DWL_SEL_BG" --hf "$DWL_SEL_FG" \
+		--sb "$DWL_SEL_BG" --sf "$DWL_SEL_FG" \
+		--bdr "$DWL_SEL_BORDER" \
+		--line-height 20 \
+		--prompt run \
+		--wrap \
+		"$@" < "$candidates"
+)
+
+[ -n "$selection" ] || exit 0
+
+appcmd=$(awk -F '\t' -v selection="$selection" '$1 == selection { print $2; exit }' "$apps")
+if [ -n "$appcmd" ]; then
+	exec sh -c "$appcmd"
+fi
+
+exec zsh -ic "$selection"

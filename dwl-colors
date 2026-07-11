@@ -1,0 +1,38 @@
+#!/bin/sh
+
+themefile=${DWL_WALLUST_THEME:-"$HOME/.cache/wallust/dwm.Xresources"}
+
+color_from_theme() {
+	key=$1
+	fallback=$2
+	value=$(sed -n "s/^${key}:[[:space:]]*//p" "$themefile" 2>/dev/null | head -n 1)
+	if [ -n "$value" ]; then
+		printf '%s\n' "$value"
+	else
+		printf '%s\n' "$fallback"
+	fi
+}
+
+hex6() {
+	printf '%s\n' "$1" | sed 's/^#//;s/[^0-9A-Fa-f].*$//'
+}
+
+export DWL_NORM_FG=$(color_from_theme "dwm.normfgcolor" "#bbbbbb")
+export DWL_NORM_BG=$(color_from_theme "dwm.normbgcolor" "#222222")
+export DWL_NORM_BORDER=$(color_from_theme "dwm.normbordercolor" "#444444")
+export DWL_SEL_FG=$(color_from_theme "dwm.selfgcolor" "#eeeeee")
+export DWL_SEL_BG=$(color_from_theme "dwm.selbgcolor" "#005577")
+export DWL_SEL_BORDER=$(color_from_theme "dwm.selbordercolor" "#005577")
+export DWL_URG_FG=$(color_from_theme "dwm.urgfgcolor" "#eeeeee")
+export DWL_URG_BG=$(color_from_theme "dwm.urgbgcolor" "#222222")
+export DWL_URG_BORDER=$(color_from_theme "dwm.urgbordercolor" "#ff5555")
+
+export DWL_NORM_FG_HEX=$(hex6 "$DWL_NORM_FG")
+export DWL_NORM_BG_HEX=$(hex6 "$DWL_NORM_BG")
+export DWL_NORM_BORDER_HEX=$(hex6 "$DWL_NORM_BORDER")
+export DWL_SEL_FG_HEX=$(hex6 "$DWL_SEL_FG")
+export DWL_SEL_BG_HEX=$(hex6 "$DWL_SEL_BG")
+export DWL_SEL_BORDER_HEX=$(hex6 "$DWL_SEL_BORDER")
+export DWL_URG_FG_HEX=$(hex6 "$DWL_URG_FG")
+export DWL_URG_BG_HEX=$(hex6 "$DWL_URG_BG")
+export DWL_URG_BORDER_HEX=$(hex6 "$DWL_URG_BORDER")

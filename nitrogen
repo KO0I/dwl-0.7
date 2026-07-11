@@ -1,0 +1,31 @@
+#!/bin/sh
+
+DWL_HELPER_DIR=${DWL_HELPER_DIR:-/usr/lib/dwl-personal}
+
+cfg=$HOME/.config/nitrogen/bg-saved.cfg
+before=
+
+if [ -e "$cfg" ]; then
+	before=$(stat -c %Y "$cfg" 2>/dev/null || true)
+fi
+
+/usr/bin/nitrogen "$@" &
+nitrogen_pid=$!
+
+while kill -0 "$nitrogen_pid" 2>/dev/null; do
+	sleep 1
+	if [ ! -e "$cfg" ]; then
+		continue
+	fi
+	after=$(stat -c %Y "$cfg" 2>/dev/null || true)
+	if [ -n "$after" ] && [ "$after" != "$before" ]; then
+		before=$after
+		dwl-wallust-refresh >/dev/null 2>&1 || true
+	fi
+done
+
+wait "$nitrogen_pid"
+status=$?
+
+dwl-wallust-refresh >/dev/null 2>&1 || true
+exit "$status"

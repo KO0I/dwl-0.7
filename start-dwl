@@ -1,0 +1,8 @@
+#!/bin/sh
+
+export DWL_HELPER_DIR=${DWL_HELPER_DIR:-/usr/lib/dwl-personal}
+export PATH="$DWL_HELPER_DIR:$PATH"
+export GTK_THEME=adw-gtk3-dark
+export QT_STYLE_OVERRIDE=kvantum
+export QT_QPA_PLATFORM='wayland;xcb'
+exec dwl -s "$DWL_HELPER_DIR/dwl-startup"

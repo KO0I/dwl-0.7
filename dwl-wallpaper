@@ -1,0 +1,11 @@
+#!/bin/sh
+
+cfg=$HOME/.config/nitrogen/bg-saved.cfg
+wallpaper=$(sed -n 's/^file=//p' "$cfg" 2>/dev/null | head -n 1)
+
+if [ -n "$wallpaper" ] && [ -r "$wallpaper" ]; then
+	printf '%s\n' "$wallpaper"
+	exit 0
+fi
+
+exit 1

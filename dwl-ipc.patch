@@ -1,0 +1,345 @@
+diff --git a/Makefile b/Makefile
+--- a/Makefile
++++ b/Makefile
+@@ -17,11 +17,12 @@
+ LDLIBS    = `$(PKG_CONFIG) --libs $(PKGS)` -lm $(LIBS)
+ 
+ all: dwl
+-dwl: dwl.o util.o
+-	$(CC) dwl.o util.o $(DWLCFLAGS) $(LDFLAGS) $(LDLIBS) -o $@
++dwl: dwl.o util.o dwl-ipc-unstable-v2-protocol.o
++	$(CC) dwl.o util.o dwl-ipc-unstable-v2-protocol.o $(DWLCFLAGS) $(LDFLAGS) $(LDLIBS) -o $@
+ dwl.o: dwl.c client.h config.h config.mk cursor-shape-v1-protocol.h \
+ 	pointer-constraints-unstable-v1-protocol.h wlr-layer-shell-unstable-v1-protocol.h \
+-	wlr-output-power-management-unstable-v1-protocol.h xdg-shell-protocol.h
++	wlr-output-power-management-unstable-v1-protocol.h xdg-shell-protocol.h \
++	dwl-ipc-unstable-v2-protocol.h
+ util.o: util.c util.h
+ 
+ # wayland-scanner is a tool which generates C headers and rigging for Wayland
+@@ -45,11 +46,18 @@
+ xdg-shell-protocol.h:
+ 	$(WAYLAND_SCANNER) server-header \
+ 		$(WAYLAND_PROTOCOLS)/stable/xdg-shell/xdg-shell.xml $@
++dwl-ipc-unstable-v2-protocol.h:
++	$(WAYLAND_SCANNER) server-header \
++		protocols/dwl-ipc-unstable-v2.xml $@
++dwl-ipc-unstable-v2-protocol.c:
++	$(WAYLAND_SCANNER) private-code \
++		protocols/dwl-ipc-unstable-v2.xml $@
++dwl-ipc-unstable-v2-protocol.o: dwl-ipc-unstable-v2-protocol.h
+ 
+ config.h:
+ 	cp config.def.h $@
+ clean:
+-	rm -f dwl *.o *-protocol.h
++	rm -f dwl *.o *-protocol.h *-protocol.c
+ 
+ dist: clean
+ 	mkdir -p dwl-$(VERSION)
+diff --git a/dwl.c b/dwl.c
+--- a/dwl.c
++++ b/dwl.c
+@@ -62,6 +62,7 @@
+ #include <wlr/util/log.h>
+ #include <wlr/util/region.h>
+ #include <xkbcommon/xkbcommon.h>
++#include "dwl-ipc-unstable-v2-protocol.h"
+ #ifdef XWAYLAND
+ #include <wlr/xwayland.h>
+ #include <xcb/xcb.h>
+@@ -243,6 +244,12 @@
+ 	struct wl_listener destroy;
+ } SessionLock;
+ 
++typedef struct {
++	struct wl_resource *resource;
++	Monitor *mon;
++	struct wl_list link;
++} DwlIpcOutput;
++
+ /* function declarations */
+ static void applybounds(Client *c, struct wlr_box *bbox);
+ static void applyrules(Client *c);
+@@ -286,6 +293,12 @@
+ static void destroysessionlock(struct wl_listener *listener, void *data);
+ static void destroysessionmgr(struct wl_listener *listener, void *data);
+ static void destroykeyboardgroup(struct wl_listener *listener, void *data);
++static void dwl_ipc_close_monitor(Monitor *m);
++static void dwl_ipc_manager_bind(struct wl_client *client, void *data,
++		uint32_t version, uint32_t id);
++static void dwl_ipc_output_destroy(struct wl_resource *resource);
++static void dwl_ipc_output_send_state(DwlIpcOutput *ipc_output);
++static void dwl_ipc_send_state(Monitor *m);
+ static Monitor *dirtomon(enum wlr_direction dir);
+ static void focusclient(Client *c, int lift);
+ static void focusmon(const Arg *arg);
+@@ -377,6 +390,8 @@
+ static struct wlr_allocator *alloc;
+ static struct wlr_compositor *compositor;
+ static struct wlr_session *session;
++static struct wl_global *dwl_ipc_global;
++static struct wl_list dwl_ipc_outputs;
+ 
+ static struct wlr_xdg_shell *xdg_shell;
+ static struct wlr_xdg_activation_v1 *activation;
+@@ -586,6 +601,225 @@
+ 	return 0;
+ }
+ 
++static Monitor *
++dwl_ipc_monitor_from_resource(struct wl_resource *resource)
++{
++	struct wlr_output *output = wlr_output_from_resource(resource);
++	return output ? output->data : NULL;
++}
++
++static uint32_t
++dwl_ipc_layout_index(Monitor *m)
++{
++	const Layout *layout = m->lt[m->sellt];
++	const Layout *l;
++
++	for (l = layouts; l < END(layouts); l++) {
++		if (l == layout)
++			return l - layouts;
++	}
++	return 0;
++}
++
++static void
++dwl_ipc_output_release(struct wl_client *client, struct wl_resource *resource)
++{
++	wl_resource_destroy(resource);
++}
++
++static void
++dwl_ipc_output_set_tags(struct wl_client *client, struct wl_resource *resource,
++		uint32_t tagmask, uint32_t toggle_tagset)
++{
++	DwlIpcOutput *ipc_output = wl_resource_get_user_data(resource);
++	Monitor *m = ipc_output ? ipc_output->mon : NULL;
++
++	if (!m || !(tagmask & TAGMASK) || (tagmask & TAGMASK) == m->tagset[m->seltags])
++		return;
++	selmon = m;
++	if (toggle_tagset)
++		m->seltags ^= 1;
++	m->tagset[m->seltags] = tagmask & TAGMASK;
++	focusclient(focustop(m), 1);
++	arrange(m);
++	printstatus();
++}
++
++static void
++dwl_ipc_output_set_client_tags(struct wl_client *client, struct wl_resource *resource,
++		uint32_t and_tags, uint32_t xor_tags)
++{
++	DwlIpcOutput *ipc_output = wl_resource_get_user_data(resource);
++	Monitor *m = ipc_output ? ipc_output->mon : NULL;
++	Client *c;
++	uint32_t newtags;
++
++	if (!m || !(c = focustop(m)) || !(newtags = (c->tags & and_tags) ^ xor_tags))
++		return;
++	selmon = m;
++	c->tags = newtags & TAGMASK;
++	focusclient(focustop(m), 1);
++	arrange(m);
++	printstatus();
++}
++
++static void
++dwl_ipc_output_set_layout(struct wl_client *client, struct wl_resource *resource,
++		uint32_t index)
++{
++	DwlIpcOutput *ipc_output = wl_resource_get_user_data(resource);
++	Monitor *m = ipc_output ? ipc_output->mon : NULL;
++
++	if (!m || index >= LENGTH(layouts))
++		return;
++	selmon = m;
++	m->lt[m->sellt] = &layouts[index];
++	strncpy(m->ltsymbol, m->lt[m->sellt]->symbol, LENGTH(m->ltsymbol));
++	arrange(m);
++	printstatus();
++}
++
++static const struct zdwl_ipc_output_v2_interface dwl_ipc_output_impl = {
++	.release = dwl_ipc_output_release,
++	.set_tags = dwl_ipc_output_set_tags,
++	.set_client_tags = dwl_ipc_output_set_client_tags,
++	.set_layout = dwl_ipc_output_set_layout,
++};
++
++static void
++dwl_ipc_manager_release(struct wl_client *client, struct wl_resource *resource)
++{
++	wl_resource_destroy(resource);
++}
++
++static void
++dwl_ipc_manager_get_output(struct wl_client *client, struct wl_resource *resource,
++		uint32_t id, struct wl_resource *output_resource)
++{
++	DwlIpcOutput *ipc_output;
++	Monitor *m = dwl_ipc_monitor_from_resource(output_resource);
++	uint32_t version = wl_resource_get_version(resource);
++
++	if (!m)
++		return;
++	ipc_output = ecalloc(1, sizeof(*ipc_output));
++	ipc_output->resource = wl_resource_create(client, &zdwl_ipc_output_v2_interface,
++			MIN(version, 2), id);
++	if (!ipc_output->resource) {
++		free(ipc_output);
++		wl_client_post_no_memory(client);
++		return;
++	}
++	ipc_output->mon = m;
++	wl_resource_set_implementation(ipc_output->resource, &dwl_ipc_output_impl,
++			ipc_output, dwl_ipc_output_destroy);
++	wl_list_insert(&dwl_ipc_outputs, &ipc_output->link);
++	dwl_ipc_output_send_state(ipc_output);
++}
++
++static const struct zdwl_ipc_manager_v2_interface dwl_ipc_manager_impl = {
++	.release = dwl_ipc_manager_release,
++	.get_output = dwl_ipc_manager_get_output,
++};
++
++static void
++dwl_ipc_manager_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id)
++{
++	struct wl_resource *resource;
++	const Layout *l;
++
++	resource = wl_resource_create(client, &zdwl_ipc_manager_v2_interface,
++			MIN(version, 2), id);
++	if (!resource) {
++		wl_client_post_no_memory(client);
++		return;
++	}
++	wl_resource_set_implementation(resource, &dwl_ipc_manager_impl, NULL, NULL);
++	zdwl_ipc_manager_v2_send_tags(resource, TAGCOUNT);
++	for (l = layouts; l < END(layouts); l++)
++		zdwl_ipc_manager_v2_send_layout(resource, l->symbol);
++}
++
++static void
++dwl_ipc_output_destroy(struct wl_resource *resource)
++{
++	DwlIpcOutput *ipc_output = wl_resource_get_user_data(resource);
++
++	if (!ipc_output)
++		return;
++	wl_list_remove(&ipc_output->link);
++	free(ipc_output);
++}
++
++static void
++dwl_ipc_close_monitor(Monitor *m)
++{
++	DwlIpcOutput *ipc_output, *tmp;
++
++	wl_list_for_each_safe(ipc_output, tmp, &dwl_ipc_outputs, link) {
++		if (ipc_output->mon == m)
++			wl_resource_destroy(ipc_output->resource);
++	}
++}
++
++static void
++dwl_ipc_output_send_state(DwlIpcOutput *ipc_output)
++{
++	Client *c, *focused;
++	Monitor *m = ipc_output->mon;
++	uint32_t i, state, nclients, focused_tag, layout;
++	const char *appid, *title;
++
++	if (!m)
++		return;
++	focused = focustop(m);
++	zdwl_ipc_output_v2_send_active(ipc_output->resource, m == selmon);
++	for (i = 0; i < TAGCOUNT; i++) {
++		state = nclients = focused_tag = 0;
++		if (m->tagset[m->seltags] & (1 << i))
++			state |= ZDWL_IPC_OUTPUT_V2_TAG_STATE_ACTIVE;
++		wl_list_for_each(c, &clients, link) {
++			if (c->mon != m || !(c->tags & (1 << i)))
++				continue;
++			nclients++;
++			if (c->isurgent)
++				state |= ZDWL_IPC_OUTPUT_V2_TAG_STATE_URGENT;
++			if (c == focused)
++				focused_tag = 1;
++		}
++		zdwl_ipc_output_v2_send_tag(ipc_output->resource, i, state, nclients, focused_tag);
++	}
++
++	layout = dwl_ipc_layout_index(m);
++	zdwl_ipc_output_v2_send_layout(ipc_output->resource, layout);
++	zdwl_ipc_output_v2_send_layout_symbol(ipc_output->resource, m->ltsymbol);
++	if (focused) {
++		title = client_get_title(focused);
++		appid = client_get_appid(focused);
++		zdwl_ipc_output_v2_send_title(ipc_output->resource, title ? title : broken);
++		zdwl_ipc_output_v2_send_appid(ipc_output->resource, appid ? appid : broken);
++		zdwl_ipc_output_v2_send_fullscreen(ipc_output->resource, focused->isfullscreen);
++		zdwl_ipc_output_v2_send_floating(ipc_output->resource, focused->isfloating);
++	} else {
++		zdwl_ipc_output_v2_send_title(ipc_output->resource, "");
++		zdwl_ipc_output_v2_send_appid(ipc_output->resource, "");
++		zdwl_ipc_output_v2_send_fullscreen(ipc_output->resource, 0);
++		zdwl_ipc_output_v2_send_floating(ipc_output->resource, 0);
++	}
++	zdwl_ipc_output_v2_send_frame(ipc_output->resource);
++}
++
++static void
++dwl_ipc_send_state(Monitor *m)
++{
++	DwlIpcOutput *ipc_output;
++
++	wl_list_for_each(ipc_output, &dwl_ipc_outputs, link) {
++		if (!m || ipc_output->mon == m)
++			dwl_ipc_output_send_state(ipc_output);
++	}
++}
++
+ void
+ arrange(Monitor *m)
+ {
+@@ -790,6 +1024,7 @@
+ 		kill(-child_pid, SIGTERM);
+ 		waitpid(child_pid, NULL, 0);
+ 	}
++	wl_global_destroy(dwl_ipc_global);
+ 	wlr_xcursor_manager_destroy(cursor_mgr);
+ 
+ 	destroykeyboardgroup(&kb_group->destroy, NULL);
+@@ -826,6 +1061,7 @@
+ 	wlr_scene_output_destroy(m->scene_output);
+ 
+ 	closemon(m);
++	dwl_ipc_close_monitor(m);
+ 	wlr_scene_node_destroy(&m->fullscreen_bg->node);
+ 	free(m);
+ }
+@@ -2174,6 +2410,7 @@
+ 		printf("%s tags %"PRIu32" %"PRIu32" %"PRIu32" %"PRIu32"\n",
+ 			m->wlr_output->name, occ, m->tagset[m->seltags], sel, urg);
+ 		printf("%s layout %s\n", m->wlr_output->name, m->ltsymbol);
++		dwl_ipc_send_state(m);
+ 	}
+ 	fflush(stdout);
+ }
+@@ -2548,6 +2785,9 @@
+ 	dpy = wl_display_create();
+ 	event_loop = wl_display_get_event_loop(dpy);
+ 	wl_event_loop_add_signal(event_loop, SIGUSR1, reloadcolorssignal, NULL);
++	wl_list_init(&dwl_ipc_outputs);
++	dwl_ipc_global = wl_global_create(dpy, &zdwl_ipc_manager_v2_interface,
++			2, NULL, dwl_ipc_manager_bind);
+ 
+ 	/* The backend is a wlroots feature which abstracts the underlying input and
+ 	 * output hardware. The autocreate option will choose the most suitable

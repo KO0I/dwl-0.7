@@ -1,0 +1,190 @@
+#!/bin/sh
+
+themefile=${DWL_WALLUST_THEME:-"$HOME/.cache/wallust/dwm.Xresources"}
+
+color_from_theme() {
+	key=$1
+	fallback=$2
+	value=$(sed -n "s/^${key}:[[:space:]]*//p" "$themefile" 2>/dev/null | head -n 1)
+	if [ -n "$value" ]; then
+		printf '%s\n' "$value"
+	else
+		printf '%s\n' "$fallback"
+	fi
+}
+
+hex6() {
+	printf '%s\n' "$1" | sed 's/^#//;s/[^0-9A-Fa-f].*$//' | cut -c 1-6
+}
+
+rgb_csv() {
+	hex=$(hex6 "$1")
+	r=$((16#$(printf '%s' "$hex" | cut -c 1-2)))
+	g=$((16#$(printf '%s' "$hex" | cut -c 3-4)))
+	b=$((16#$(printf '%s' "$hex" | cut -c 5-6)))
+	printf '%s,%s,%s\n' "$r" "$g" "$b"
+}
+
+argb() {
+	printf '#ff%s\n' "$(hex6 "$1")"
+}
+
+fg=$(color_from_theme "dwm.normfgcolor" "#eeeeee")
+bg=$(color_from_theme "dwm.normbgcolor" "#111111")
+border=$(color_from_theme "dwm.normbordercolor" "#666666")
+selbg=$(color_from_theme "dwm.selbgcolor" "#577799")
+selfg=$(color_from_theme "dwm.selfgcolor" "$fg")
+urgent=$(color_from_theme "dwm.urgbordercolor" "#aa4444")
+float=$(color_from_theme "dwm.floatbordercolor" "$border")
+
+fg_hex=$(hex6 "$fg")
+bg_hex=$(hex6 "$bg")
+border_hex=$(hex6 "$border")
+selbg_hex=$(hex6 "$selbg")
+selfg_hex=$(hex6 "$selfg")
+urgent_hex=$(hex6 "$urgent")
+float_hex=$(hex6 "$float")
+
+fg_rgb=$(rgb_csv "$fg")
+bg_rgb=$(rgb_csv "$bg")
+border_rgb=$(rgb_csv "$border")
+selbg_rgb=$(rgb_csv "$selbg")
+selfg_rgb=$(rgb_csv "$selfg")
+urgent_rgb=$(rgb_csv "$urgent")
+float_rgb=$(rgb_csv "$float")
+
+mkdir -p "$HOME/.config/gtk-3.0" "$HOME/.config/gtk-4.0" \
+	"$HOME/.config/qt5ct/colors" "$HOME/.config/qt6ct/colors" \
+	"$HOME/.config/Kvantum/Wallust"
+
+for gtkver in gtk-3.0 gtk-4.0; do
+	cat > "$HOME/.config/$gtkver/settings.ini" <<EOF
+[Settings]
+gtk-theme-name=adw-gtk3-dark
+gtk-icon-theme-name=Adwaita
+gtk-font-name=Adwaita Sans 11
+gtk-cursor-theme-name=Adwaita
+gtk-cursor-theme-size=24
+gtk-application-prefer-dark-theme=1
+gtk-toolbar-style=GTK_TOOLBAR_BOTH
+gtk-toolbar-icon-size=GTK_ICON_SIZE_LARGE_TOOLBAR
+gtk-button-images=1
+gtk-menu-images=1
+gtk-enable-event-sounds=1
+gtk-enable-input-feedback-sounds=0
+gtk-xft-antialias=1
+gtk-xft-hinting=1
+gtk-xft-hintstyle=hintslight
+gtk-xft-rgba=none
+EOF
+	cat > "$HOME/.config/$gtkver/gtk.css" <<EOF
+@define-color theme_fg_color #$fg_hex;
+@define-color theme_text_color #$fg_hex;
+@define-color theme_bg_color #$bg_hex;
+@define-color theme_base_color #$bg_hex;
+@define-color theme_selected_bg_color #$selbg_hex;
+@define-color theme_selected_fg_color #$selfg_hex;
+@define-color borders #$border_hex;
+@define-color warning_color #$urgent_hex;
+@define-color accent_bg_color #$selbg_hex;
+@define-color accent_fg_color #$selfg_hex;
+
+window, dialog, popover, menu, .background {
+	background-color: #$bg_hex;
+	color: #$fg_hex;
+}
+
+entry, textview, treeview, list, viewport {
+	background-color: #$bg_hex;
+	color: #$fg_hex;
+}
+
+button, headerbar, toolbar, notebook > header {
+	background-color: #$bg_hex;
+	color: #$fg_hex;
+	border-color: #$border_hex;
+}
+
+*:selected, selection {
+	background-color: #$selbg_hex;
+	color: #$selfg_hex;
+}
+EOF
+done
+
+qt_active="$(argb "$fg"), $(argb "$bg"), $(argb "$border"), $(argb "$float"), $(argb "$bg"), $(argb "$border"), $(argb "$fg"), $(argb "$selfg"), $(argb "$fg"), $(argb "$bg"), $(argb "$bg"), $(argb "$bg"), $(argb "$selbg"), $(argb "$selfg"), $(argb "$selbg"), $(argb "$urgent"), $(argb "$border"), $(argb "$fg"), $(argb "$bg"), $(argb "$fg"), #80$fg_hex"
+qt_disabled="#ff808080, $(argb "$bg"), $(argb "$border"), $(argb "$float"), $(argb "$bg"), $(argb "$border"), #ff808080, $(argb "$selfg"), #ff808080, $(argb "$bg"), $(argb "$bg"), $(argb "$bg"), $(argb "$selbg"), #ff808080, $(argb "$selbg"), $(argb "$urgent"), $(argb "$border"), $(argb "$fg"), $(argb "$bg"), $(argb "$fg"), #80$fg_hex"
+
+for qtdir in qt5ct qt6ct; do
+	cat > "$HOME/.config/$qtdir/colors/wallust.conf" <<EOF
+[ColorScheme]
+active_colors=$qt_active
+disabled_colors=$qt_disabled
+inactive_colors=$qt_active
+EOF
+	cat > "$HOME/.config/$qtdir/${qtdir}.conf" <<EOF
+[Appearance]
+color_scheme_path=$HOME/.config/$qtdir/colors/wallust.conf
+custom_palette=true
+icon_theme=Adwaita
+standard_dialogs=default
+style=kvantum
+
+[Fonts]
+fixed="Monospace,10,-1,5,50,0,0,0,0,0"
+general="Adwaita Sans,11,-1,5,50,0,0,0,0,0"
+
+[Interface]
+activate_item_on_single_click=1
+buttonbox_layout=0
+cursor_flash_time=1000
+dialog_buttons_have_icons=1
+double_click_interval=400
+gui_effects=@Invalid()
+menus_have_icons=true
+show_shortcuts_in_context_menus=true
+stylesheets=/usr/share/$qtdir/qss/fusion-fixes.qss
+toolbutton_style=4
+underline_shortcut=1
+wheel_scroll_lines=3
+EOF
+done
+
+cp -f /usr/share/Kvantum/KvArcDark/KvArcDark.svg "$HOME/.config/Kvantum/Wallust/Wallust.svg"
+awk -v fg="#$fg_hex" -v bg="#$bg_hex" -v border="#$border_hex" \
+	-v sel="#$selbg_hex" -v selfg="#$selfg_hex" -v urgent="#$urgent_hex" \
+	-v float="#$float_hex" '
+		/^\[GeneralColors\]/ {
+			print;
+			print "window.color=" bg;
+			print "base.color=" bg;
+			print "alt.base.color=" bg;
+			print "button.color=" bg;
+			print "light.color=" border;
+			print "mid.light.color=" border;
+			print "dark.color=black";
+			print "mid.color=" bg;
+			print "highlight.color=" sel;
+			print "inactive.highlight.color=" sel;
+			print "text.color=" fg;
+			print "window.text.color=" fg;
+			print "button.text.color=" fg;
+			print "disabled.text.color=#808080";
+			print "tooltip.text.color=" fg;
+			print "highlight.text.color=" selfg;
+			print "link.color=" float;
+			print "link.visited.color=" urgent;
+			print "progress.indicator.text.color=" selfg;
+			skip = 1;
+			next;
+		}
+		/^\[/ && skip { skip = 0 }
+		!skip { print }
+	' /usr/share/Kvantum/KvArcDark/KvArcDark.kvconfig > "$HOME/.config/Kvantum/Wallust/Wallust.kvconfig"
+
+cat > "$HOME/.config/Kvantum/kvantum.kvconfig" <<EOF
+[General]
+theme=Wallust
+EOF
+
+printf '%s\n' "Applied dark wallust GTK/Qt theme from $themefile"

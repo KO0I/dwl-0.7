@@ -1,0 +1,8 @@
+#!/bin/sh
+
+command -v dwlb >/dev/null 2>&1 || exit 0
+DWL_HELPER_DIR=${DWL_HELPER_DIR:-/usr/lib/dwl-personal}
+. "$DWL_HELPER_DIR/dwl-colors"
+
+status="^fg(${DWL_NORM_FG_HEX})^bg(${DWL_NORM_BG_HEX})$(date '+%a %Y-%m-%d %H:%M')"
+dwlb -status all "$status" >/dev/null 2>&1 || true

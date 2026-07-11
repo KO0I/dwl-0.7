@@ -1,0 +1,19 @@
+#!/bin/sh
+
+DWL_HELPER_DIR=${DWL_HELPER_DIR:-/usr/lib/dwl-personal}
+. "$DWL_HELPER_DIR/dwl-colors"
+
+exec dwlb \
+	-ipc \
+	-no-bottom \
+	-font "Terminus:size=12" \
+	-active-fg-color "$DWL_SEL_FG_HEX" \
+	-active-bg-color "$DWL_SEL_BG_HEX" \
+	-occupied-fg-color "$DWL_SEL_FG_HEX" \
+	-occupied-bg-color "$DWL_NORM_BG_HEX" \
+	-inactive-fg-color "$DWL_NORM_FG_HEX" \
+	-inactive-bg-color "$DWL_NORM_BG_HEX" \
+	-urgent-fg-color "$DWL_URG_FG_HEX" \
+	-urgent-bg-color "$DWL_URG_BG_HEX" \
+	-middle-bg-color "$DWL_NORM_BG_HEX" \
+	-middle-bg-color-selected "$DWL_SEL_BG_HEX"
