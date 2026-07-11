@@ -15,9 +15,9 @@ It intentionally uses the released `dwl` 0.7 tarball, not `dwl-git`.
   toggle, `Alt+n` tag naming, and `Alt+F5` wallust refresh.
 - Extra dwm-style layouts: `Alt+c` for columns and `Alt+g` for grid, alongside
   tile, floating, and monocle.
-- Experimental wobbly floating-window drags on the `wildin_wobbly` branch. This
-  is a springy scene-geometry wobble for `Alt` mouse move/resize, not a full
-  Compiz-style textured mesh deformation.
+- Optional experimental wobbly floating-window drags on the `wildin_wobbly`
+  branch. This is a springy scene-geometry wobble for `Alt` mouse move/resize,
+  not a full Compiz-style textured mesh deformation.
 - `dwl-runtime-colors.patch`, which teaches `dwl` to read
   `~/.cache/wallust/dwm.Xresources` and reload root/border colors on `SIGUSR1`.
 - `dwl-ipc.patch` plus `dwl-ipc-unstable-v2.xml`, which add the IPC protocol
@@ -44,6 +44,14 @@ Build and install the local package:
 
 ```sh
 makepkg -si
+```
+
+The saved wobbly-window patch is not applied by default. To build with the
+experimental springy floating-window drag effect:
+
+```sh
+DWL_ENABLE_WOBBLY=1 makepkg -f
+sudo pacman -U ./dwl-0.7-*.pkg.tar.zst
 ```
 
 Or build first, then install with pacman:

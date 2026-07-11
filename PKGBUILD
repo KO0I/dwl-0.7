@@ -2,7 +2,7 @@
 # Personal dynamic-color DWL package for Amber.
 pkgname=dwl
 pkgver=0.7
-pkgrel=10
+pkgrel=11
 pkgdesc="Simple, hackable dynamic tiling Wayland compositor (dwm for Wayland)"
 arch=('x86_64')
 url="https://codeberg.org/dwl/dwl"
@@ -69,7 +69,9 @@ prepare() {
 	patch -Np1 -i "$srcdir/dwl-ipc.patch"
 	patch -Np1 -i "$srcdir/dwl-nametag.patch"
 	patch -Np1 -i "$srcdir/dwl-layouts.patch"
-	patch -Np1 -i "$srcdir/dwl-wobbly.patch"
+	if [ "${DWL_ENABLE_WOBBLY:-0}" = 1 ]; then
+		patch -Np1 -i "$srcdir/dwl-wobbly.patch"
+	fi
 	# Compile with XWayland support for older suckless/X-oriented tools.
 	sed -i -e '/-DXWAYLAND\|xcb/s/^#//' config.mk
 }
