@@ -7,7 +7,7 @@ export VST_PATH="/home/amber/proj/music_projects/VSTPlugins/VstPlugins"
 export _JAVA_AWT_WM_NONREPARENTING=1
 export DWL_HELPER_DIR=${DWL_HELPER_DIR:-/usr/lib/dwl-personal}
 export PATH="$DWL_HELPER_DIR:$PATH"
-export GTK_THEME=adw-gtk3-dark
+export GTK_THEME=Wallust-Dark
 export QT_STYLE_OVERRIDE=kvantum
 export QT_QPA_PLATFORM='wayland;xcb'
 

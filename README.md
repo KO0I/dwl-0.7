@@ -11,8 +11,8 @@ It intentionally uses the released `dwl` 0.7 tarball, not `dwl-git`.
 ## What This Adds Over Plain DWL
 
 - A custom `config.h` with Alt-based dwm-style bindings, XWayland enabled,
-  sloppy focus, `Alt+p` launcher, `Alt+b` bar toggle, and `Alt+F5` wallust
-  refresh.
+  sloppy focus, `Alt+p` launcher, `Alt+Shift+w` Zen Browser, `Alt+b` bar
+  toggle, and `Alt+F5` wallust refresh.
 - `dwl-runtime-colors.patch`, which teaches `dwl` to read
   `~/.cache/wallust/dwm.Xresources` and reload root/border colors on `SIGUSR1`.
 - `dwl-ipc.patch` plus `dwl-ipc-unstable-v2.xml`, which add the IPC protocol
@@ -24,7 +24,10 @@ It intentionally uses the released `dwl` 0.7 tarball, not `dwl-git`.
 - A Nitrogen compatibility wrapper for picking wallpaper while `swaybg` displays
   it under Wayland.
 - A wallust refresh command that updates the wallpaper, compositor colors,
-  `dwlb`, and GTK/Qt/Kvantum dark theme files from the selected wallpaper.
+  `dwlb`, GTK/Qt/Kvantum dark theme files, and Zen Browser chrome CSS from the
+  selected wallpaper.
+- A generated `Wallust-Dark` GTK theme under `~/.themes` so LXAppearance shows
+  the active wallust theme as a selectable named theme instead of Adwaita.
 - Dark-by-default GTK and Qt environment defaults for new applications launched
   inside the session.
 
@@ -76,8 +79,15 @@ Press `Alt+F5` inside DWL after changing wallpaper, or run:
 dwl-wallust-refresh
 ```
 
-That command reruns wallust, updates toolkit themes, restarts `swaybg`, signals
-`dwl` with `SIGUSR1`, and restarts `dwlb`.
+That command reruns wallust, updates toolkit themes, regenerates the
+LXAppearance-visible `Wallust-Dark` GTK theme, restarts `swaybg`, signals `dwl`
+with `SIGUSR1`, and restarts `dwlb`.
+
+Zen Browser profiles are auto-detected under `~/.zen`. If Zen has created a
+profile, the refresh command writes `chrome/dwl-wallust.css`, imports it from
+`chrome/userChrome.css`, and enables browser chrome CSS in `user.js`. Restart
+Zen after refreshing colors so the browser chrome picks up the new selected bar
+accent.
 
 Recommended optional runtime packages:
 

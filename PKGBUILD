@@ -2,7 +2,7 @@
 # Personal dynamic-color DWL package for Amber.
 pkgname=dwl
 pkgver=0.7
-pkgrel=4
+pkgrel=6
 pkgdesc="Simple, hackable dynamic tiling Wayland compositor (dwm for Wayland)"
 arch=('x86_64')
 url="https://codeberg.org/dwl/dwl"

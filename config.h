@@ -25,6 +25,7 @@ static int log_level = WLR_ERROR;
 static const Rule rules[] = {
 	/* app_id             title       tags mask     isfloating   monitor */
 	{ "Gimp",             NULL,       0,            0,           -1 },
+	{ "zen",              NULL,       0,            0,           -1 },
 	{ "firefox",          NULL,       0,            0,           -1 },
 	{ "thunderbird",      "Msgcompose", 0,          1,           -1 },
 };
@@ -115,6 +116,7 @@ static const enum libinput_config_tap_button_map button_map = LIBINPUT_CONFIG_TA
 /* commands */
 static const char *menucmd[] = { "dwl-bemenu-run", NULL };
 static const char *termcmd[] = { "/home/amber/scripts/colorshuffle", NULL };
+static const char *browsercmd[] = { "zen-browser", NULL };
 static const char *emailcmd[] = { "thunderbird", NULL };
 static const char *lockcmd[] = { "swaylock", NULL };
 static const char *taskcmd[] = { "/bin/sh", "-c", "/home/amber/scripts/todo", NULL };
@@ -126,6 +128,7 @@ static const Key keys[] = {
 	/* modifier                  key                 function        argument */
 	{ MODKEY,                    XKB_KEY_p,          spawn,          {.v = menucmd} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_Return,     spawn,          {.v = termcmd} },
+	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_W,          spawn,          {.v = browsercmd} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_e,          spawn,          {.v = emailcmd} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_minus,      spawn,          {.v = lockcmd} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_k,          spawn,          {.v = taskcmd} },
