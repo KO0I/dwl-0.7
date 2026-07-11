@@ -1,0 +1,60 @@
+#!/bin/sh
+
+DWL_HELPER_DIR=${DWL_HELPER_DIR:-/usr/lib/dwl-personal}
+. "$DWL_HELPER_DIR/dwl-colors"
+
+tagfile=${DWL_TAG_NAMES:-"$HOME/.config/dwl/tag-names"}
+tags=$1
+
+[ -n "$tags" ] || exit 0
+
+selection=$(
+	printf '\n' |
+	bemenu \
+		--fn "Terminus 12" \
+		--tb "$DWL_NORM_BG" --tf "$DWL_NORM_FG" \
+		--fb "$DWL_NORM_BG" --ff "$DWL_NORM_FG" \
+		--nb "$DWL_NORM_BG" --nf "$DWL_NORM_FG" \
+		--hb "$DWL_SEL_BG" --hf "$DWL_SEL_FG" \
+		--sb "$DWL_SEL_BG" --sf "$DWL_SEL_FG" \
+		--bdr "$DWL_SEL_BORDER" \
+		--line-height 20 \
+		--prompt tag \
+		--wrap
+)
+status=$?
+
+[ "$status" -eq 0 ] || exit 0
+
+mkdir -p "$(dirname "$tagfile")" || exit 1
+tmp=$tagfile.tmp.$$
+trap 'rm -f "$tmp"' EXIT HUP INT TERM
+
+is_selected_tag() {
+	case " $tags " in
+		*" $1 "*) return 0 ;;
+		*) return 1 ;;
+	esac
+}
+
+i=1
+while [ "$i" -le 9 ]; do
+	label=$(sed -n "${i}p" "$tagfile" 2>/dev/null)
+	[ -n "$label" ] || label=$i
+	if is_selected_tag "$i"; then
+		if [ -n "$selection" ]; then
+			label=$i:$selection
+		else
+			label=$i
+		fi
+	fi
+	printf '%s\n' "$label"
+	i=$((i + 1))
+done > "$tmp" && mv "$tmp" "$tagfile"
+
+if command -v dwlb >/dev/null 2>&1; then
+	pkill -u "$(id -u)" -x dwlb 2>/dev/null || true
+	"$DWL_HELPER_DIR/dwlb-launch" &
+	sleep 0.2
+	"$DWL_HELPER_DIR/dwlb-status" &
+fi

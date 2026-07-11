@@ -1,0 +1,41 @@
+--- a/dwl.c
++++ b/dwl.c
+@@ -324,3 +324,4 @@ static void motionnotify(uint32_t time, struct wlr_input_device *device, double
+ static void motionrelative(struct wl_listener *listener, void *data);
+ static void moveresize(const Arg *arg);
++static void nametag(const Arg *arg);
+ static void outputmgrapply(struct wl_listener *listener, void *data);
+@@ -2352,4 +2353,31 @@ moveresize(const Arg *arg)
+ 	}
+ }
+ 
++static void
++nametag(const Arg *arg)
++{
++	char tagarg[128], *p = tagarg;
++	size_t left = sizeof tagarg;
++	int i, written;
++	uint32_t tagmask;
++	const char *cmd[] = { "dwl-nametag", tagarg, NULL };
++	Arg spawnarg = { .v = cmd };
++
++	if (!selmon)
++		return;
++
++	tagmask = selmon->tagset[selmon->seltags] & TAGMASK;
++	for (i = 0; i < TAGCOUNT; i++) {
++		if (!(tagmask & (1 << i)))
++			continue;
++		written = snprintf(p, left, "%s%d", p == tagarg ? "" : " ", i + 1);
++		if (written < 0 || (size_t)written >= left)
++			break;
++		p += written;
++		left -= written;
++	}
++	if (p != tagarg)
++		spawn(&spawnarg);
++}
++
+ void
+ pointerfocus(Client *c, struct wlr_surface *surface, double sx, double sy,
+ 		uint32_t time)

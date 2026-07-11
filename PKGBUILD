@@ -2,7 +2,7 @@
 # Personal dynamic-color DWL package for Amber.
 pkgname=dwl
 pkgver=0.7
-pkgrel=7
+pkgrel=8
 pkgdesc="Simple, hackable dynamic tiling Wayland compositor (dwm for Wayland)"
 arch=('x86_64')
 url="https://codeberg.org/dwl/dwl"
@@ -23,6 +23,7 @@ source=("https://codeberg.org/dwl/dwl/releases/download/v$pkgver/$pkgname-v$pkgv
         config.h
         dwl-runtime-colors.patch
         dwl-ipc.patch
+        dwl-nametag.patch
         dwl-ipc-unstable-v2.xml
         start-dwl
         dwl-wallust-refresh
@@ -31,10 +32,13 @@ source=("https://codeberg.org/dwl/dwl/releases/download/v$pkgver/$pkgname-v$pkgv
         dwl-colors
         dwl-wallpaper
         dwl-apply-toolkit-theme
+        dwl-nametag
         dwlb-launch
         dwlb-status
         nitrogen)
 sha256sums=('16e1412385f5fecaea997f734cb290f2bc412929da5b523c7c5180c6bd9402ea'
+            SKIP
+            SKIP
             SKIP
             SKIP
             SKIP
@@ -59,6 +63,7 @@ prepare() {
 	patch -Np1 -i "$srcdir/dwl-runtime-colors.patch"
 	cp -f "$srcdir/dwl-ipc-unstable-v2.xml" protocols/dwl-ipc-unstable-v2.xml
 	patch -Np1 -i "$srcdir/dwl-ipc.patch"
+	patch -Np1 -i "$srcdir/dwl-nametag.patch"
 	# Compile with XWayland support for older suckless/X-oriented tools.
 	sed -i -e '/-DXWAYLAND\|xcb/s/^#//' config.mk
 }
@@ -80,6 +85,7 @@ package() {
 	install -Dm755 "$srcdir/dwl-colors" "$pkgdir/usr/lib/dwl-personal/dwl-colors"
 	install -Dm755 "$srcdir/dwl-wallpaper" "$pkgdir/usr/lib/dwl-personal/dwl-wallpaper"
 	install -Dm755 "$srcdir/dwl-apply-toolkit-theme" "$pkgdir/usr/lib/dwl-personal/dwl-apply-toolkit-theme"
+	install -Dm755 "$srcdir/dwl-nametag" "$pkgdir/usr/lib/dwl-personal/dwl-nametag"
 	install -Dm755 "$srcdir/dwlb-launch" "$pkgdir/usr/lib/dwl-personal/dwlb-launch"
 	install -Dm755 "$srcdir/dwlb-status" "$pkgdir/usr/lib/dwl-personal/dwlb-status"
 	install -Dm755 "$srcdir/nitrogen" "$pkgdir/usr/lib/dwl-personal/nitrogen"

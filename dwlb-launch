@@ -3,10 +3,33 @@
 DWL_HELPER_DIR=${DWL_HELPER_DIR:-/usr/lib/dwl-personal}
 . "$DWL_HELPER_DIR/dwl-colors"
 
+tagfile=${DWL_TAG_NAMES:-"$HOME/.config/dwl/tag-names"}
+
+tag_label() {
+	n=$1
+	label=$(sed -n "${n}p" "$tagfile" 2>/dev/null)
+	if [ -n "$label" ]; then
+		printf '%s\n' "$label"
+	else
+		printf '%s\n' "$n"
+	fi
+}
+
+tag1=$(tag_label 1)
+tag2=$(tag_label 2)
+tag3=$(tag_label 3)
+tag4=$(tag_label 4)
+tag5=$(tag_label 5)
+tag6=$(tag_label 6)
+tag7=$(tag_label 7)
+tag8=$(tag_label 8)
+tag9=$(tag_label 9)
+
 exec dwlb \
 	-ipc \
 	-no-bottom \
 	-font "Terminus:size=12" \
+	-tags 9 "$tag1" "$tag2" "$tag3" "$tag4" "$tag5" "$tag6" "$tag7" "$tag8" "$tag9" \
 	-active-fg-color "$DWL_SEL_FG_HEX" \
 	-active-bg-color "$DWL_SEL_BG_HEX" \
 	-occupied-fg-color "$DWL_SEL_FG_HEX" \

@@ -14,6 +14,8 @@
 !/dwlb-launch
 !/dwl-runtime-colors.patch
 !/dwl-ipc.patch
+!/dwl-nametag.patch
 !/dwl-ipc-unstable-v2.xml
+!/dwl-nametag
 !/nitrogen
 !/start-dwl

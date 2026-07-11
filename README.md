@@ -12,13 +12,15 @@ It intentionally uses the released `dwl` 0.7 tarball, not `dwl-git`.
 
 - A custom `config.h` with Alt-based dwm-style bindings, XWayland enabled,
   sloppy focus, `Alt+p` launcher, `Alt+Shift+w` Zen Browser, `Alt+b` bar
-  toggle, and `Alt+F5` wallust refresh.
+  toggle, `Alt+n` tag naming, and `Alt+F5` wallust refresh.
 - `dwl-runtime-colors.patch`, which teaches `dwl` to read
   `~/.cache/wallust/dwm.Xresources` and reload root/border colors on `SIGUSR1`.
 - `dwl-ipc.patch` plus `dwl-ipc-unstable-v2.xml`, which add the IPC protocol
   needed by `dwlb -ipc` so tag clicks on the bar switch tags.
 - A `dwlb` top bar launcher and status updater that read the same wallust color
   file as the compositor.
+- Persistent `Alt+n` tag names stored in `~/.config/dwl/tag-names`, shown by
+  `dwlb` while preserving clickable IPC tags.
 - A `bemenu` launcher wrapper that combines desktop applications, executable
   commands, zsh aliases/functions, recent zsh history, and typed shell snippets.
 - A Nitrogen compatibility wrapper for picking wallpaper while `swaybg` displays
@@ -82,6 +84,10 @@ dwl-wallust-refresh
 That command reruns wallust, updates toolkit themes, regenerates the
 LXAppearance-visible `Wallust-Dark` GTK theme, restarts `swaybg`, signals `dwl`
 with `SIGUSR1`, and restarts `dwlb`.
+
+Press `Alt+n` to name the currently selected tag. Submitting an empty name
+resets that tag to its number. The names persist across bar refreshes and DWL
+restarts.
 
 Zen Browser profiles are auto-detected under `~/.zen`. If Zen has created a
 profile, the refresh command writes `chrome/dwl-wallust.css`, imports it from
