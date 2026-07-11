@@ -13,6 +13,8 @@ It intentionally uses the released `dwl` 0.7 tarball, not `dwl-git`.
 - A custom `config.h` with Alt-based dwm-style bindings, XWayland enabled,
   sloppy focus, `Alt+p` launcher, `Alt+Shift+w` Zen Browser, `Alt+b` bar
   toggle, `Alt+n` tag naming, and `Alt+F5` wallust refresh.
+- Extra dwm-style layouts: `Alt+c` for columns and `Alt+g` for grid, alongside
+  tile, floating, and monocle.
 - `dwl-runtime-colors.patch`, which teaches `dwl` to read
   `~/.cache/wallust/dwm.Xresources` and reload root/border colors on `SIGUSR1`.
 - `dwl-ipc.patch` plus `dwl-ipc-unstable-v2.xml`, which add the IPC protocol
