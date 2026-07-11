@@ -1,0 +1,230 @@
+--- a/dwl.c
++++ b/dwl.c
+@@ -341,6 +341,7 @@
+ static void requeststartdrag(struct wl_listener *listener, void *data);
+ static void requestmonstate(struct wl_listener *listener, void *data);
+ static void resize(Client *c, struct wlr_box geo, int interact);
++static void resizeapply(Client *c, struct wlr_box geo);
+ static void run(char *startup_cmd);
+ static void setcursor(struct wl_listener *listener, void *data);
+ static void setcursorshape(struct wl_listener *listener, void *data);
+@@ -371,6 +372,10 @@
+ static void view(const Arg *arg);
+ static void virtualkeyboard(struct wl_listener *listener, void *data);
+ static void virtualpointer(struct wl_listener *listener, void *data);
++static void wobblybegin(Client *c);
++static void wobblyrelease(Client *c);
++static void wobblystop(Client *c);
++static int wobblytick(void *data);
+ static Monitor *xytomon(double x, double y);
+ static void xytonode(double x, double y, struct wlr_surface **psurface,
+ 		Client **pc, LayerSurface **pl, double *nx, double *ny);
+@@ -430,6 +435,15 @@
+ static Client *grabc;
+ static int grabcx, grabcy; /* client-relative */
+ 
++static struct wl_event_source *wobblytimer;
++static struct {
++	Client *client;
++	struct wlr_box target;
++	double x, y, width, height;
++	double vx, vy, vwidth, vheight;
++	int active, settling;
++} wobbly;
++
+ static struct wlr_output_layout *output_layout;
+ static struct wlr_box sgeom;
+ static struct wl_list mons;
+@@ -979,6 +993,7 @@
+ 			/* Drop the window off on its new monitor */
+ 			selmon = xytomon(cursor->x, cursor->y);
+ 			setmon(grabc, selmon, 0);
++			wobblyrelease(grabc);
+ 			return;
+ 		} else {
+ 			cursor_mode = CurNormal;
+@@ -2317,6 +2332,7 @@
+ 
+ 	/* Float the window and tell motionnotify to grab it */
+ 	setfloating(grabc, 1);
++	wobblybegin(grabc);
+ 	switch (cursor_mode = arg->ui) {
+ 	case CurMove:
+ 		grabcx = (int)round(cursor->x) - grabc->geom.x;
+@@ -2617,6 +2633,7 @@
+ {
+ 	struct wlr_box *bbox;
+ 	struct wlr_box clip;
++	struct wlr_box visual;
+ 
+ 	if (!c->mon || !client_surface(c)->mapped)
+ 		return;
+@@ -2626,17 +2643,20 @@
+ 	client_set_bounds(c, geo.width, geo.height);
+ 	c->geom = geo;
+ 	applybounds(c, bbox);
++	if (wobbly_windows && wobbly.client == c && wobbly.active) {
++		wobbly.target = c->geom;
++		visual = (struct wlr_box){
++			.x = (int)round(wobbly.x),
++			.y = (int)round(wobbly.y),
++			.width = MAX(1 + 2 * (int)c->bw, (int)round(wobbly.width)),
++			.height = MAX(1 + 2 * (int)c->bw, (int)round(wobbly.height)),
++		};
++	} else {
++		visual = c->geom;
++	}
+ 
+ 	/* Update scene-graph, including borders */
+-	wlr_scene_node_set_position(&c->scene->node, c->geom.x, c->geom.y);
+-	wlr_scene_node_set_position(&c->scene_surface->node, c->bw, c->bw);
+-	wlr_scene_rect_set_size(c->border[0], c->geom.width, c->bw);
+-	wlr_scene_rect_set_size(c->border[1], c->geom.width, c->bw);
+-	wlr_scene_rect_set_size(c->border[2], c->bw, c->geom.height - 2 * c->bw);
+-	wlr_scene_rect_set_size(c->border[3], c->bw, c->geom.height - 2 * c->bw);
+-	wlr_scene_node_set_position(&c->border[1]->node, 0, c->geom.height - c->bw);
+-	wlr_scene_node_set_position(&c->border[2]->node, 0, c->bw);
+-	wlr_scene_node_set_position(&c->border[3]->node, c->geom.width - c->bw, c->bw);
++	resizeapply(c, visual);
+ 
+ 	/* this is a no-op if size hasn't changed */
+ 	c->resize = client_set_size(c, c->geom.width - 2 * c->bw,
+@@ -2646,6 +2666,20 @@
+ }
+ 
+ void
++resizeapply(Client *c, struct wlr_box geo)
++{
++	wlr_scene_node_set_position(&c->scene->node, geo.x, geo.y);
++	wlr_scene_node_set_position(&c->scene_surface->node, c->bw, c->bw);
++	wlr_scene_rect_set_size(c->border[0], geo.width, c->bw);
++	wlr_scene_rect_set_size(c->border[1], geo.width, c->bw);
++	wlr_scene_rect_set_size(c->border[2], c->bw, geo.height - 2 * c->bw);
++	wlr_scene_rect_set_size(c->border[3], c->bw, geo.height - 2 * c->bw);
++	wlr_scene_node_set_position(&c->border[1]->node, 0, geo.height - c->bw);
++	wlr_scene_node_set_position(&c->border[2]->node, 0, c->bw);
++	wlr_scene_node_set_position(&c->border[3]->node, geo.width - c->bw, c->bw);
++}
++
++void
+ run(char *startup_cmd)
+ {
+ 	/* Add a Unix socket to the Wayland display. */
+@@ -3035,6 +3069,7 @@
+ 	LISTEN_STATIC(&cursor->events.button, buttonpress);
+ 	LISTEN_STATIC(&cursor->events.axis, axisnotify);
+ 	LISTEN_STATIC(&cursor->events.frame, cursorframe);
++	wobblytimer = wl_event_loop_add_timer(event_loop, wobblytick, NULL);
+ 
+ 	cursor_shape_mgr = wlr_cursor_shape_manager_v1_create(dpy, 1);
+ 	LISTEN_STATIC(&cursor_shape_mgr->events.request_set_shape, setcursorshape);
+@@ -3238,6 +3273,7 @@
+ 		cursor_mode = CurNormal;
+ 		grabc = NULL;
+ 	}
++	wobblystop(c);
+ 
+ 	if (client_is_unmanaged(c)) {
+ 		if (c == exclusive_focus) {
+@@ -3423,6 +3459,101 @@
+ 		wlr_cursor_map_input_to_output(cursor, device, event->suggested_output);
+ }
+ 
++void
++wobblybegin(Client *c)
++{
++	if (!wobbly_windows || !c || c->isfullscreen || client_is_unmanaged(c))
++		return;
++
++	wobbly.client = c;
++	wobbly.target = c->geom;
++	wobbly.x = c->geom.x;
++	wobbly.y = c->geom.y;
++	wobbly.width = c->geom.width;
++	wobbly.height = c->geom.height;
++	wobbly.vx = wobbly.vy = wobbly.vwidth = wobbly.vheight = 0;
++	wobbly.active = 1;
++	wobbly.settling = 0;
++	wl_event_source_timer_update(wobblytimer, wobbly_frame_ms);
++}
++
++void
++wobblyrelease(Client *c)
++{
++	if (!wobbly_windows || wobbly.client != c || !wobbly.active)
++		return;
++
++	wobbly.settling = 1;
++	wl_event_source_timer_update(wobblytimer, wobbly_frame_ms);
++}
++
++void
++wobblystop(Client *c)
++{
++	if (wobbly.client != c)
++		return;
++
++	wobbly.active = 0;
++	wobbly.settling = 0;
++	wobbly.client = NULL;
++	wl_event_source_timer_update(wobblytimer, 0);
++}
++
++int
++wobblytick(void *data)
++{
++	Client *c = wobbly.client;
++	struct wlr_box visual;
++	double dx, dy, dw, dh, max;
++
++	if (!wobbly.active || !c || !c->mon || !client_surface(c)->mapped) {
++		wobblystop(c);
++		return 0;
++	}
++
++	dx = wobbly.target.x - wobbly.x;
++	dy = wobbly.target.y - wobbly.y;
++	dw = wobbly.target.width - wobbly.width;
++	dh = wobbly.target.height - wobbly.height;
++	max = (double)wobbly_max_displacement;
++
++	wobbly.vx = (wobbly.vx + dx * wobbly_stiffness) * wobbly_damping;
++	wobbly.vy = (wobbly.vy + dy * wobbly_stiffness) * wobbly_damping;
++	wobbly.vwidth = (wobbly.vwidth + dw * wobbly_stiffness) * wobbly_damping;
++	wobbly.vheight = (wobbly.vheight + dh * wobbly_stiffness) * wobbly_damping;
++
++	wobbly.x += wobbly.vx;
++	wobbly.y += wobbly.vy;
++	wobbly.width += wobbly.vwidth;
++	wobbly.height += wobbly.vheight;
++
++	wobbly.x = MAX(wobbly.target.x - max, MIN(wobbly.target.x + max, wobbly.x));
++	wobbly.y = MAX(wobbly.target.y - max, MIN(wobbly.target.y + max, wobbly.y));
++	wobbly.width = MAX(wobbly.target.width - max, MIN(wobbly.target.width + max, wobbly.width));
++	wobbly.height = MAX(wobbly.target.height - max, MIN(wobbly.target.height + max, wobbly.height));
++
++	if (wobbly.settling
++			&& fabs(dx) < 0.5 && fabs(dy) < 0.5 && fabs(dw) < 0.5 && fabs(dh) < 0.5
++			&& fabs(wobbly.vx) < 0.5 && fabs(wobbly.vy) < 0.5
++			&& fabs(wobbly.vwidth) < 0.5 && fabs(wobbly.vheight) < 0.5) {
++		resizeapply(c, wobbly.target);
++		wobblystop(c);
++		return 0;
++	}
++
++	visual = (struct wlr_box){
++		.x = (int)round(wobbly.x),
++		.y = (int)round(wobbly.y),
++		.width = MAX(1 + 2 * (int)c->bw, (int)round(wobbly.width)),
++		.height = MAX(1 + 2 * (int)c->bw, (int)round(wobbly.height)),
++	};
++	resizeapply(c, visual);
++	if (c->mon)
++		wlr_output_schedule_frame(c->mon->wlr_output);
++	wl_event_source_timer_update(wobblytimer, wobbly_frame_ms);
++	return 0;
++}
++
+ Monitor *
+ xytomon(double x, double y)
+ {

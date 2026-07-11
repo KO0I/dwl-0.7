@@ -7,6 +7,11 @@
 static const int sloppyfocus               = 1;  /* focus follows mouse */
 static const int bypass_surface_visibility = 0;  /* 1 means idle inhibitors will disable idle tracking even if it's surface isn't visible  */
 static const unsigned int borderpx         = 2;  /* border pixel of windows */
+static const int wobbly_windows            = 1;  /* spring floating mouse drags */
+static const int wobbly_frame_ms           = 16;
+static const int wobbly_max_displacement   = 96;
+static const double wobbly_stiffness       = 0.28;
+static const double wobbly_damping         = 0.72;
 static float rootcolor[]                   = COLOR(0x222222ff);
 static float bordercolor[]                 = COLOR(0x444444ff);
 static float focuscolor[]                  = COLOR(0x005577ff);
