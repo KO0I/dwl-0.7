@@ -102,8 +102,3 @@ Recommended optional runtime packages:
 ```sh
 sudo pacman -S --needed dwlb bemenu wallust swaybg nitrogen qt5ct qt6ct kvantum kvantum-qt5 nwg-look adw-gtk-theme
 ```
-
-## Notes
-
-Generated tarballs, build directories, and local package artifacts are ignored.
-Commit the package source files, not built `.pkg.tar.zst` files.
