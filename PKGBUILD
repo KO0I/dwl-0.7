@@ -21,10 +21,6 @@ optdepends=('xorg-xwayland: for XWayland support'
             'adw-gtk-theme: dark GTK theme base')
 source=("https://codeberg.org/dwl/dwl/releases/download/v$pkgver/$pkgname-v$pkgver.tar.gz"
         config.h
-        dwl-runtime-colors.patch
-        dwl-ipc.patch
-        dwl-nametag.patch
-        dwl-layouts.patch
         dwl-ipc-unstable-v2.xml
         start-dwl
         dwl-wallust-refresh
@@ -50,10 +46,6 @@ sha256sums=('16e1412385f5fecaea997f734cb290f2bc412929da5b523c7c5180c6bd9402ea'
             SKIP
             SKIP
             SKIP
-            SKIP
-            SKIP
-            SKIP
-            SKIP
             SKIP)
 
 prepare() {
@@ -62,11 +54,11 @@ prepare() {
 	if [ -s "$srcdir/config.h" ]; then
 		cp -f "$srcdir/config.h" config.h
 	fi
-	patch -Np1 -i "$srcdir/dwl-runtime-colors.patch"
+	patch -Np1 -i "$startdir/patches/dwl-runtime-colors.patch"
 	cp -f "$srcdir/dwl-ipc-unstable-v2.xml" protocols/dwl-ipc-unstable-v2.xml
-	patch -Np1 -i "$srcdir/dwl-ipc.patch"
-	patch -Np1 -i "$srcdir/dwl-nametag.patch"
-	patch -Np1 -i "$srcdir/dwl-layouts.patch"
+	patch -Np1 -i "$startdir/patches/dwl-ipc.patch"
+	patch -Np1 -i "$startdir/patches/dwl-nametag.patch"
+	patch -Np1 -i "$startdir/patches/dwl-layouts.patch"
 	# Compile with XWayland support for older suckless/X-oriented tools.
 	sed -i -e '/-DXWAYLAND\|xcb/s/^#//' config.mk
 }

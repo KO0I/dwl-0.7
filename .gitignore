@@ -12,10 +12,8 @@
 !/dwl-wallust-refresh
 !/dwlb-status
 !/dwlb-launch
-!/dwl-runtime-colors.patch
-!/dwl-ipc.patch
-!/dwl-nametag.patch
-!/dwl-layouts.patch
+!/patches/
+!/patches/*.patch
 !/dwl-ipc-unstable-v2.xml
 !/dwl-nametag
 !/nitrogen
